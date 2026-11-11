@@ -64,6 +64,32 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      
+      - name: Align Java and Kotlin targets to 17
+        run: |
+          BUILD_FILE="$PROJECT_DIR/app/build.gradle.kts"
+
+          if [ ! -f "$BUILD_FILE" ]; then
+            echo "Cannot find app/build.gradle.kts"
+            exit 1
+          fi
+
+          cat >> "$BUILD_FILE" <<'EOF'
+
+          android {
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+          }
+
+          tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          }
+          EOF
+
       - name: Build debug APK
         run: |
           gradle -p "$PROJECT_DIR" assembleDebug
