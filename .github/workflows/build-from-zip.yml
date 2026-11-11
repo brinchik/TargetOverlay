@@ -12,6 +12,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,8 +24,10 @@ jobs:
             echo "Project ZIP archive not found"
             exit 1
           fi
+
           mkdir extracted
           unzip -q "$ZIP" -d extracted
+
           if [ -f extracted/TargetOverlay/settings.gradle.kts ]; then
             PROJECT_DIR="extracted/TargetOverlay"
           elif [ -f extracted/settings.gradle.kts ]; then
@@ -34,6 +37,7 @@ jobs:
             find extracted -maxdepth 3 -type f | head -80
             exit 1
           fi
+
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
       - name: Set up Java 17
@@ -42,11 +46,18 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Install Android SDK packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+
+          if [ -z "$SDKMANAGER" ]; then
+            echo "sdkmanager not found"
+            exit 1
+          fi
+
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -54,12 +65,15 @@ jobs:
           gradle-version: '8.9'
 
       - name: Build debug APK
-        run: gradle -p "$PROJECT_DIR" assembleDebug
+        run: |
+          gradle -p "$PROJECT_DIR" assembleDebug
+          mkdir -p output
+          cp "$PROJECT_DIR/app/build/outputs/apk/debug/app-debug.apk" output/TargetOverlay-debug.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TargetOverlay-debug-APK
-          path: extracted/TargetOverlay/app/build/outputs/apk/debug/app-debug.apk
+          path: output/TargetOverlay-debug.apk
           if-no-files-found: error
           retention-days: 14
